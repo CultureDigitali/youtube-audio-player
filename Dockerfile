@@ -1,0 +1,24 @@
+FROM node:20-slim
+
+# Installa Python e pip per yt-dlp
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-venv \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installa yt-dlp
+RUN python3 -m pip install --break-system-packages yt-dlp
+
+# Crea directory app
+WORKDIR /app
+
+# Copia tutti i file
+COPY . .
+
+# Esponi la porta (Render usa PORT env var)
+EXPOSE 3000
+
+# Avvia il server
+CMD ["node", "server.js"]

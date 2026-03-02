@@ -1,0 +1,33 @@
+{
+    "name": "YouTube Audio Player",
+    "short_name": "YT Audio",
+    "description": "Ascolta audio da YouTube in background",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0F0F0F",
+    "theme_color": "#FF0000",
+    "orientation": "portrait",
+    "scope": "/",
+    "lang": "it",
+    "categories": [
+        "music",
+        "entertainment",
+        "utilities"
+    ],
+    "icons": [
+        {
+            "src": "assets/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "assets/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "screenshots": [],
+    "prefer_related_applications": false
+}
