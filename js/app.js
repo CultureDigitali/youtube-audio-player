@@ -1,6 +1,6 @@
 /**
- * App principale per YouTube Audio Player v2.0
- * Gestisce l'interfaccia utente e gli eventi
+ * App principale per YouTube Audio Player v3.0
+ * Gestisce l'interfaccia utente, gli eventi, i18n e hero landing
  */
 
 (function () {
@@ -39,6 +39,12 @@
         tabBtns = document.querySelectorAll('.tab-btn');
         playlistContainer = document.getElementById('playlist-container');
 
+        // i18n: populate language selector
+        initI18n();
+
+        // Hero section
+        initHero();
+
         player = new AudioPlayer();
 
         // Player callbacks
@@ -55,8 +61,57 @@
 
         setupEventListeners();
         loadInitialUI();
-        urlInput?.focus();
-        console.log('YouTube Audio Player v2.0 inizializzato');
+
+        // Focus input only if hero is hidden
+        if (localStorage.getItem('ytap_hero_seen')) {
+            urlInput?.focus();
+        }
+        console.log('YouTube Audio Player v3.0 ready');
+    }
+
+    // === i18n INIT ===
+    function initI18n() {
+        const selectorContainer = document.getElementById('lang-selector');
+        if (selectorContainer && typeof I18N !== 'undefined') {
+            // Populate the existing select element
+            Object.keys(I18N.langNames).forEach(code => {
+                const opt = document.createElement('option');
+                opt.value = code;
+                opt.textContent = I18N.langNames[code];
+                if (code === I18N.currentLang()) opt.selected = true;
+                selectorContainer.appendChild(opt);
+            });
+            selectorContainer.addEventListener('change', (e) => {
+                I18N.setLang(e.target.value);
+                // Re-render current tab for translated empty states
+                renderTabContent(currentTab);
+            });
+            // Apply initial translations
+            I18N.applyTranslations();
+        }
+    }
+
+    // === HERO SECTION ===
+    function initHero() {
+        const hero = document.getElementById('hero-section');
+        const cta = document.getElementById('hero-cta');
+        const mainContent = document.getElementById('main-content');
+
+        if (!hero) return;
+
+        // Show hero only if not seen before
+        if (localStorage.getItem('ytap_hero_seen')) {
+            hero.classList.add('hidden');
+        } else {
+            // Keep main content visible but hero on top
+        }
+
+        // CTA click: hide hero, focus input
+        cta?.addEventListener('click', () => {
+            hero.classList.add('hidden');
+            localStorage.setItem('ytap_hero_seen', '1');
+            urlInput?.focus();
+        });
     }
 
     // === EVENT LISTENERS ===
@@ -118,31 +173,25 @@
 
         // Settings Actions
         document.getElementById('clear-queue-btn')?.addEventListener('click', () => {
-            if (confirm('Sei sicuro di voler svuotare la coda?')) {
-                player?.clearQueue();
-                renderTabContent(currentTab);
-                document.getElementById('settings-modal').classList.add('hidden');
-                showToast('Coda svuotata');
-            }
+            player?.clearQueue();
+            renderTabContent(currentTab);
+            document.getElementById('settings-modal').classList.add('hidden');
+            showToast(I18N.t('queueCleared'));
         });
 
         document.getElementById('clear-history-btn')?.addEventListener('click', () => {
-            if (confirm('Sei sicuro di voler eliminare la cronologia?')) {
-                Storage.clearHistory();
-                renderTabContent(currentTab);
-                document.getElementById('settings-modal').classList.add('hidden');
-                showToast('Cronologia eliminata');
-            }
+            Storage.clearHistory();
+            renderTabContent(currentTab);
+            document.getElementById('settings-modal').classList.add('hidden');
+            showToast(I18N.t('historyCleared'));
         });
 
         document.getElementById('clear-favorites-btn')?.addEventListener('click', () => {
-            if (confirm('Sei sicuro di voler eliminare tutti i preferiti?')) {
-                Storage.clearFavorites();
-                renderTabContent(currentTab);
-                updateLikeButton();
-                document.getElementById('settings-modal').classList.add('hidden');
-                showToast('Preferiti eliminati');
-            }
+            Storage.clearFavorites();
+            renderTabContent(currentTab);
+            updateLikeButton();
+            document.getElementById('settings-modal').classList.add('hidden');
+            showToast(I18N.t('favCleared'));
         });
 
         // Save playlist modal
@@ -170,7 +219,7 @@
     async function handlePlay() {
         const url = urlInput?.value?.trim();
         if (!url || !API.isValidYouTubeUrl(url)) {
-            showToast('⚠️ Inserisci un URL YouTube valido');
+            showToast('⚠️ ' + I18N.t('invalidUrl'));
             return;
         }
 
@@ -205,7 +254,7 @@
     async function handleAddToQueue() {
         const url = urlInput?.value?.trim();
         if (!url || !API.isValidYouTubeUrl(url)) {
-            showToast('⚠️ Inserisci un URL YouTube valido');
+            showToast('⚠️ ' + I18N.t('invalidUrl'));
             return;
         }
 
@@ -218,9 +267,9 @@
 
             const added = player.addToQueue(result.data);
             if (added) {
-                showToast(`➕ Aggiunto alla coda: ${result.data.title}`);
+                showToast(`➕ ${I18N.t('addedToQueue')} ${result.data.title}`);
             } else {
-                showToast('⚠️ Questo video è già in coda');
+                showToast('⚠️ Already in queue');
             }
 
             // Pulisci input
@@ -256,10 +305,11 @@
     // === LIKE / PiP / Copy ===
     function handleLike() {
         if (!currentVideoData) return;
-        const isFav = Storage.toggleFavorite(currentVideoData);
-        likeBtn.textContent = isFav ? '❤️' : '🤍';
-        likeBtn.classList.toggle('liked', isFav);
-        showToast(isFav ? '❤️ Aggiunto ai preferiti' : '💔 Rimosso dai preferiti');
+        const wasFav = Storage.isFavorite(currentVideoData.videoId);
+        const isNowFav = Storage.toggleFavorite(currentVideoData);
+        showToast(isNowFav ? I18N.t('addedToFav') : I18N.t('removedFromFav'));
+        likeBtn.textContent = isNowFav ? '❤️' : '🤍';
+        likeBtn.classList.toggle('liked', isNowFav);
         if (currentTab === 'favorites') renderTabContent('favorites');
     }
 
@@ -287,9 +337,9 @@
         const url = `https://youtube.com/watch?v=${currentVideoData.videoId}`;
         navigator.clipboard.writeText(url).then(() => {
             copyBtn.textContent = '✓';
-            showToast('📋 URL copiato!');
+            showToast(I18N.t('copiedUrl'));
             setTimeout(() => { copyBtn.textContent = '📋'; }, 2000);
-        }).catch(() => showToast('❌ Impossibile copiare'));
+        }).catch(() => showToast('❌ Copy failed'));
     }
 
     // === TABS ===
@@ -312,8 +362,8 @@
 
         switch (tab) {
             case 'queue': renderQueue(); break;
-            case 'history': renderList(Storage.getHistory(), 'Nessuna cronologia recente'); break;
-            case 'favorites': renderList(Storage.getFavorites(), 'Nessun video preferito'); break;
+            case 'history': renderList(Storage.getHistory(), I18N.t('emptyHistory')); break;
+            case 'favorites': renderList(Storage.getFavorites(), I18N.t('emptyFavorites')); break;
             case 'playlists': renderPlaylists(); break;
         }
     }
@@ -324,10 +374,7 @@
         const currentIdx = player?.getCurrentIndex() ?? -1;
 
         if (items.length === 0) {
-            playlistContainer.innerHTML = `
-                <p class="empty-state">La coda è vuota.<br>
-                <small>Incolla un link YouTube e premi <strong>+ Coda</strong> per aggiungere brani,<br>
-                oppure premi <strong>▶ Riproduci</strong> per ascoltare subito.</small></p>`;
+            playlistContainer.innerHTML = `<p class="empty-state">${I18N.t('emptyQueue')}</p>`;
             return;
         }
 

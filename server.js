@@ -497,12 +497,24 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
     console.log('');
     console.log('╔════════════════════════════════════════════════════╗');
-    console.log('║   🎵 YouTube Audio Player - Server v2.1            ║');
+    console.log('║   🎵 YouTube Audio Player - Server v3.0            ║');
     console.log(`║   🌐 http://localhost:${PORT}                          ║`);
     console.log('║   🔧 Backend: cobalt.tools + yt-dlp (fallback)     ║');
     console.log('║   ✅ Funziona sia in locale che nel cloud!          ║');
     console.log('╚════════════════════════════════════════════════════╝');
     console.log('');
-    console.log(`Apri http://localhost:${PORT} nel browser per iniziare.`);
-    console.log('');
+
+    // Self-ping per evitare il timeout di Render (free tier)
+    if (process.env.RENDER && process.env.RENDER_EXTERNAL_HOSTNAME) {
+        const pingUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/api/status`;
+        setInterval(() => {
+            https.get(pingUrl, (res) => {
+                console.log(`[KEEP-ALIVE] Ping → ${res.statusCode}`);
+            }).on('error', (err) => {
+                console.log(`[KEEP-ALIVE] Ping fallito:`, err.message);
+            });
+        }, 14 * 60 * 1000); // Ogni 14 minuti
+        console.log('[KEEP-ALIVE] Self-ping attivo (ogni 14 min)');
+    }
 });
+

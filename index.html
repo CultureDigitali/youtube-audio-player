@@ -3,34 +3,86 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Ascolta audio da YouTube in background">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="Ascolta audio da YouTube in background, a schermo spento. Gratis, senza account.">
     <meta name="theme-color" content="#0F0F0F">
-    <title>YouTube Audio Player</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>YouTube Audio Player — Ascolta a schermo spento</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 
 <body>
     <div class="app-container">
         <header class="app-header">
-            <button id="menu-btn" class="icon-btn" aria-label="Menu">☰</button>
-            <h1>🎵 YouTube Audio</h1>
-            <button id="settings-btn" class="icon-btn" aria-label="Impostazioni">⚙️</button>
+            <button id="menu-btn" class="icon-btn" data-i18n-aria="info" aria-label="Info">☰</button>
+            <h1 data-i18n="appTitle">🎵 YouTube Audio</h1>
+            <div class="header-actions">
+                <select id="lang-selector" aria-label="Language"></select>
+                <button id="settings-btn" class="icon-btn" data-i18n-aria="settings"
+                    aria-label="Impostazioni">⚙️</button>
+            </div>
         </header>
 
-        <main class="main-content">
+        <!-- ═══ HERO / LANDING SECTION ═══ -->
+        <section id="hero-section" class="hero-section">
+            <div class="hero-bg-glow"></div>
+            <div class="hero-content">
+                <h2 class="hero-title" data-i18n="heroTitle">Ascolta YouTube<br>a schermo spento</h2>
+                <p class="hero-subtitle" data-i18n="heroSubtitle">
+                    Finalmente puoi goderti la musica di YouTube dal tuo smartphone senza tenere lo schermo acceso.
+                    Risparmia batteria, dati e concentrati solo sull'ascolto.
+                </p>
+
+                <div class="hero-features">
+                    <div class="feature-card">
+                        <div class="feature-icon" data-i18n="feature1Title">📱 Schermo Spento</div>
+                        <p data-i18n="feature1Desc">L'audio continua anche quando blocchi lo schermo o cambi app.
+                            Perfetto per passeggiate e allenamenti.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon" data-i18n="feature2Title">📋 Coda & Playlist</div>
+                        <p data-i18n="feature2Desc">Crea la tua coda di brani, salva playlist per dopo. Come un vero
+                            player musicale.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon" data-i18n="feature3Title">🆓 100% Gratis</div>
+                        <p data-i18n="feature3Desc">Nessun account, nessun abbonamento. Incolla il link e ascolta.
+                            Punto.</p>
+                    </div>
+                </div>
+
+                <button id="hero-cta" class="hero-cta" data-i18n="ctaBtn">🎧 Inizia ad ascoltare</button>
+
+                <div class="hero-how">
+                    <h3 data-i18n="howTitle">Come funziona?</h3>
+                    <div class="how-steps">
+                        <p data-i18n="how1">1. Copia il link del video YouTube</p>
+                        <p data-i18n="how2">2. Incollalo qui sopra</p>
+                        <p data-i18n="how3">3. Premi Riproduci e spegni lo schermo!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ MAIN PLAYER ═══ -->
+        <main class="main-content" id="main-content">
             <section class="search-section">
                 <div class="input-wrapper">
-                    <input type="text" id="url-input" placeholder="Incolla link YouTube..." autocomplete="off"
-                        aria-label="Inserisci URL YouTube">
+                    <input type="text" id="url-input" data-i18n="inputPlaceholder" placeholder="Incolla link YouTube..."
+                        autocomplete="off" aria-label="Inserisci URL YouTube">
                     <button id="clear-btn" class="icon-btn" aria-label="Cancella">✕</button>
                 </div>
                 <div class="play-actions">
-                    <button id="play-btn" class="primary-btn" disabled>
+                    <button id="play-btn" class="primary-btn" disabled data-i18n="playBtn">
                         ▶ Riproduci
                     </button>
-                    <button id="add-queue-btn" class="secondary-btn" disabled title="Aggiungi alla coda">
+                    <button id="add-queue-btn" class="secondary-btn" disabled data-i18n="addQueue"
+                        data-i18n-title="addQueue">
                         + Coda
                     </button>
                 </div>
@@ -49,13 +101,14 @@
 
             <section id="player-section" class="player-section hidden">
                 <div class="player-controls">
-                    <button id="shuffle-btn" class="control-btn small-control" aria-label="Shuffle"
-                        title="Shuffle">🔀</button>
-                    <button id="prev-btn" class="control-btn" aria-label="Precedente">◀◀</button>
-                    <button id="play-pause-btn" class="control-btn play-btn" aria-label="Play/Pausa">▶</button>
-                    <button id="next-btn" class="control-btn" aria-label="Successivo">▶▶</button>
-                    <button id="repeat-btn" class="control-btn small-control" aria-label="Ripeti"
-                        title="Ripeti">🔁</button>
+                    <button id="shuffle-btn" class="control-btn small-control" data-i18n-aria="shuffle"
+                        data-i18n-title="shuffle" aria-label="Shuffle" title="Shuffle">🔀</button>
+                    <button id="prev-btn" class="control-btn" data-i18n-aria="prev" aria-label="Precedente">◀◀</button>
+                    <button id="play-pause-btn" class="control-btn play-btn" data-i18n-aria="playPause"
+                        aria-label="Play/Pausa">▶</button>
+                    <button id="next-btn" class="control-btn" data-i18n-aria="next" aria-label="Successivo">▶▶</button>
+                    <button id="repeat-btn" class="control-btn small-control" data-i18n-aria="repeat"
+                        data-i18n-title="repeat" aria-label="Ripeti" title="Ripeti">🔁</button>
                 </div>
 
                 <div class="progress-container">
@@ -70,18 +123,20 @@
                 </div>
 
                 <div class="action-buttons">
-                    <button id="like-btn" class="action-btn" aria-label="Preferiti">🤍</button>
-                    <button id="pip-btn" class="action-btn" aria-label="Picture in Picture">📺</button>
-                    <button id="copy-btn" class="action-btn" aria-label="Copia URL">📋</button>
+                    <button id="like-btn" class="action-btn" data-i18n-aria="favorites"
+                        aria-label="Preferiti">🤍</button>
+                    <button id="pip-btn" class="action-btn" data-i18n-aria="pip"
+                        aria-label="Picture in Picture">📺</button>
+                    <button id="copy-btn" class="action-btn" data-i18n-aria="copyUrl" aria-label="Copia URL">📋</button>
                 </div>
             </section>
 
             <section class="playlist-section">
                 <div class="tabs">
-                    <button class="tab-btn active" data-tab="queue">Coda</button>
-                    <button class="tab-btn" data-tab="history">Cronologia</button>
-                    <button class="tab-btn" data-tab="favorites">Preferiti</button>
-                    <button class="tab-btn" data-tab="playlists">Playlist</button>
+                    <button class="tab-btn active" data-tab="queue" data-i18n="queue">Coda</button>
+                    <button class="tab-btn" data-tab="history" data-i18n="history">Cronologia</button>
+                    <button class="tab-btn" data-tab="favorites" data-i18n="favoritesTab">Preferiti</button>
+                    <button class="tab-btn" data-tab="playlists" data-i18n="playlists">Playlist</button>
                 </div>
                 <div id="playlist-container" class="playlist-container">
                     <!-- Playlist items will be inserted here -->
@@ -95,7 +150,7 @@
         <!-- Loading overlay -->
         <div id="loading-overlay" class="loading-overlay hidden">
             <div class="spinner"></div>
-            <p>Caricamento...</p>
+            <p data-i18n="loading">Caricamento...</p>
         </div>
 
         <!-- Toast notifications -->
@@ -105,15 +160,16 @@
         <div id="menu-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Informazioni</h2>
-                    <button class="close-modal icon-btn" aria-label="Chiudi">✕</button>
+                    <h2 data-i18n="info">Informazioni</h2>
+                    <button class="close-modal icon-btn" data-i18n-aria="close" aria-label="Chiudi">✕</button>
                 </div>
                 <div class="modal-body">
                     <p><strong>YouTube Audio Player</strong></p>
-                    <p>Versione 2.0.0</p>
-                    <p>Ascolta i tuoi video YouTube preferiti in background come se fosse una piattaforma di streaming
-                        audio.</p>
-                    <p style="margin-top: 15px;"><em>Sviluppato per uso personale e didattico.</em></p>
+                    <p data-i18n="version">Versione 3.0.0</p>
+                    <p data-i18n="infoText">Ascolta i tuoi video YouTube preferiti in background come se fosse una
+                        piattaforma di streaming audio.</p>
+                    <p style="margin-top: 15px;"><em data-i18n="devNote">Sviluppato per uso personale e didattico.</em>
+                    </p>
                 </div>
             </div>
         </div>
@@ -122,21 +178,21 @@
         <div id="settings-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Impostazioni</h2>
-                    <button class="close-modal icon-btn" aria-label="Chiudi">✕</button>
+                    <h2 data-i18n="settings">Impostazioni</h2>
+                    <button class="close-modal icon-btn" data-i18n-aria="close" aria-label="Chiudi">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="setting-item">
-                        <span>Svuota coda attuale</span>
-                        <button id="clear-queue-btn" class="secondary-btn">Svuota</button>
+                        <span data-i18n="clearQueue">Svuota coda attuale</span>
+                        <button id="clear-queue-btn" class="secondary-btn" data-i18n="clearBtn">Svuota</button>
                     </div>
                     <div class="setting-item">
-                        <span>Svuota cronologia riproduzione</span>
-                        <button id="clear-history-btn" class="secondary-btn">Svuota</button>
+                        <span data-i18n="clearHistory">Svuota cronologia riproduzione</span>
+                        <button id="clear-history-btn" class="secondary-btn" data-i18n="clearBtn">Svuota</button>
                     </div>
                     <div class="setting-item">
-                        <span>Elimina preferiti</span>
-                        <button id="clear-favorites-btn" class="secondary-btn">Elimina</button>
+                        <span data-i18n="clearFavorites">Elimina preferiti</span>
+                        <button id="clear-favorites-btn" class="secondary-btn" data-i18n="deleteBtn">Elimina</button>
                     </div>
                 </div>
             </div>
@@ -146,20 +202,21 @@
         <div id="save-playlist-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Salva Playlist</h2>
-                    <button class="close-modal icon-btn" aria-label="Chiudi">✕</button>
+                    <h2 data-i18n="savePlaylist">Salva Playlist</h2>
+                    <button class="close-modal icon-btn" data-i18n-aria="close" aria-label="Chiudi">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="input-wrapper" style="margin-bottom: 15px;">
-                        <input type="text" id="playlist-name-input" placeholder="Nome della playlist..."
-                            autocomplete="off">
+                        <input type="text" id="playlist-name-input" data-i18n="playlistName"
+                            placeholder="Nome della playlist..." autocomplete="off">
                     </div>
-                    <button id="save-playlist-confirm-btn" class="primary-btn">💾 Salva</button>
+                    <button id="save-playlist-confirm-btn" class="primary-btn" data-i18n="save">💾 Salva</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="js/i18n.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/api.js"></script>
     <script src="js/player.js"></script>
