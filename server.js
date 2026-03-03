@@ -32,6 +32,9 @@ const MIME_TYPES = {
 const cache = new Map();
 const CACHE_TTL = 30 * 60 * 1000;
 
+// Percorso cookies per yt-dlp (bypassa blocco IP datacenter)
+const COOKIES_PATH = path.join(__dirname, 'cookies.txt');
+
 function getCached(key) {
     const entry = cache.get(key);
     if (entry && Date.now() - entry.time < CACHE_TTL) {
@@ -47,7 +50,28 @@ function setCache(key, data) {
 }
 
 /**
+ * Costruisce gli argomenti base di yt-dlp (con supporto cookies)
+ */
+function getYtDlpBaseArgs() {
+    const args = [
+        '-m', 'yt_dlp',
+        '--no-warnings',
+        '--no-check-certificates',
+        '--geo-bypass',
+    ];
+
+    // Se esiste il file cookies.txt, usalo
+    if (fs.existsSync(COOKIES_PATH)) {
+        args.push('--cookies', COOKIES_PATH);
+        console.log('[YT-DLP] Usando cookies.txt per autenticazione');
+    }
+
+    return args;
+}
+
+/**
  * Estrae le info del video usando yt-dlp
+ * Tenta prima con il client web, poi con client alternativi se fallisce
  */
 function extractVideoInfo(videoId) {
     return new Promise((resolve, reject) => {
@@ -56,19 +80,31 @@ function extractVideoInfo(videoId) {
 
         const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-        // Usa python -m yt_dlp per assicurarsi che funzioni
-        const proc = execFile('python', [
-            '-m', 'yt_dlp',
+        const baseArgs = getYtDlpBaseArgs();
+        const args = [
+            ...baseArgs,
             '-j',                    // Output JSON
             '--no-download',         // Non scaricare il video
             '-f', 'bestaudio',       // Solo il miglior audio
-            '--no-warnings',         // Nessun warning
-            '--no-check-certificates',
             ytUrl
-        ], { timeout: 30000, maxBuffer: 1024 * 1024 * 5 }, (error, stdout, stderr) => {
+        ];
+
+        console.log(`[YT-DLP] Estrazione: ${videoId}...`);
+
+        const proc = execFile('python3', args, {
+            timeout: 60000,
+            maxBuffer: 1024 * 1024 * 5
+        }, (error, stdout, stderr) => {
             if (error) {
                 console.error(`[YT-DLP] Errore:`, error.message);
-                reject(new Error('Impossibile estrarre i dati del video. Verifica che l\'URL sia corretto.'));
+                if (stderr) console.error(`[YT-DLP] Stderr:`, stderr.slice(0, 500));
+
+                // Suggerisci l'uso di cookies se non sono configurati
+                const hint = fs.existsSync(COOKIES_PATH)
+                    ? 'I cookies potrebbero essere scaduti. Ricaricali da /api/upload-cookies.'
+                    : 'Prova a caricare i cookies YouTube su /api/upload-cookies per sbloccare.';
+
+                reject(new Error(`Impossibile estrarre i dati del video. ${hint}`));
                 return;
             }
 
@@ -192,7 +228,7 @@ const server = http.createServer(async (req, res) => {
     // CORS headers per tutte le risposte API
     if (pathname.startsWith('/api/')) {
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
         if (req.method === 'OPTIONS') {
             res.writeHead(204);
@@ -248,6 +284,44 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // === API: Upload cookies (per sbloccare YouTube da datacenter) ===
+    if (pathname === '/api/upload-cookies' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', () => {
+            try {
+                if (!body || body.length < 10) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Cookies vuoti o troppo corti' }));
+                    return;
+                }
+                fs.writeFileSync(COOKIES_PATH, body, 'utf8');
+                console.log(`[COOKIES] Salvati ${body.length} bytes in cookies.txt`);
+                cache.clear(); // Pulisci la cache per usare i nuovi cookies
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'Cookies salvati! Riprova a riprodurre un video.' }));
+            } catch (err) {
+                console.error('[COOKIES] Errore salvataggio:', err.message);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Errore nel salvataggio dei cookies' }));
+            }
+        });
+        return;
+    }
+
+    // === API: Stato del server ===
+    if (pathname === '/api/status') {
+        const hasCookies = fs.existsSync(COOKIES_PATH);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            status: 'ok',
+            cookies: hasCookies,
+            cacheSize: cache.size,
+            uptime: Math.floor(process.uptime())
+        }));
+        return;
+    }
+
     // === API: Ricerca video (usa yt-dlp) ===
     if (pathname === '/api/search') {
         const query = parsedUrl.query.q;
@@ -259,14 +333,14 @@ const server = http.createServer(async (req, res) => {
 
         try {
             const results = await new Promise((resolve, reject) => {
-                execFile('python', [
-                    '-m', 'yt_dlp',
-                    `ytsearch5:${query}`,   // Cerca 5 risultati
+                const searchArgs = [
+                    ...getYtDlpBaseArgs(),
+                    `ytsearch5:${query}`,
                     '--flat-playlist',
                     '-j',
                     '--no-download',
-                    '--no-warnings',
-                ], { timeout: 15000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
+                ];
+                execFile('python3', searchArgs, { timeout: 30000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
                     if (error) { reject(error); return; }
                     const items = stdout.trim().split('\n').map(line => {
                         try { return JSON.parse(line); } catch { return null; }
