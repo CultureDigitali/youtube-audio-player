@@ -301,17 +301,13 @@ function isYtBotChallengeError(message) {
     const msg = String(message || '').toLowerCase();
     return msg.includes('sign in to confirm you\'re not a bot') ||
         msg.includes('sign in to confirm you are not a bot') ||
-        msg.includes('use --cookies') ||
         msg.includes('requires account to view');
 }
 
 async function extractWithYtDlp(videoId) {
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const cookiesPath = path.join(__dirname, 'cookies.txt');
-    const cookieArgs = fs.existsSync(cookiesPath) ? ['--cookies', cookiesPath] : [];
 
     const baseArgs = [
-        ...cookieArgs,
         '--dump-single-json',
         '--no-warnings',
         '--no-playlist',
@@ -478,9 +474,9 @@ async function extractVideoInfo(videoId) {
 
     if (!audioResult || !audioResult.audioUrl) {
         if (ytdlpAttempt?.botBlocked) {
-            throw new Error('YouTube richiede verifica anti-bot per questo video. Configura cookies.txt o abilita un backend cloud fallback.');
+            throw new Error('YouTube richiede verifica anti-bot per questo video. Modalita no-cookies attiva: prova un altro video.');
         }
-        throw new Error('Impossibile estrarre l\'audio dal video richiesto. Riprova con un altro link o verifica fallback/cookies.');
+        throw new Error('Impossibile estrarre l\'audio dal video richiesto. Riprova con un altro link.');
     }
 
     const result = {
@@ -586,26 +582,6 @@ function serveStatic(filePath, res) {
     });
 }
 
-function readRequestBody(req, maxBytes = 1024 * 1024) {
-    return new Promise((resolve, reject) => {
-        let total = 0;
-        const chunks = [];
-
-        req.on('data', (chunk) => {
-            total += chunk.length;
-            if (total > maxBytes) {
-                reject(new Error('Payload troppo grande'));
-                req.destroy();
-                return;
-            }
-            chunks.push(chunk);
-        });
-
-        req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-        req.on('error', reject);
-    });
-}
-
 // Directory base dell'app
 const APP_DIR = __dirname;
 
@@ -676,7 +652,6 @@ const server = http.createServer(async (req, res) => {
 
     // ─── API: Stato server ───────────────────────────
     if (pathname === '/api/status') {
-        const hasCookies = fs.existsSync(path.join(__dirname, 'cookies.txt'));
         const backends = ['yt-dlp'];
         if (COBALT_INSTANCES.length > 0) backends.push('cobalt');
         if (ENABLE_YTDL_CORE_FALLBACK) backends.push('ytdl-core');
@@ -686,48 +661,10 @@ const server = http.createServer(async (req, res) => {
             backends,
             cobaltConfigured: COBALT_INSTANCES.length > 0,
             ytdlCoreFallback: ENABLE_YTDL_CORE_FALLBACK,
-            cookies: hasCookies,
+            cookieMode: 'disabled',
             cacheSize: cache.size,
             uptime: Math.floor(process.uptime())
         }));
-        return;
-    }
-
-    // ─── API: Upload cookies.txt (per bypass challenge anti-bot) ─────────
-    if (pathname === '/api/upload-cookies') {
-        if (req.method !== 'POST') {
-            res.writeHead(405, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: 'Metodo non consentito' }));
-            return;
-        }
-
-        try {
-            const rawBody = await readRequestBody(req, 2 * 1024 * 1024);
-            const content = rawBody.replace(/\r\n/g, '\n').trim();
-
-            if (!content) {
-                throw new Error('Contenuto vuoto');
-            }
-            if (!content.includes('youtube.com')) {
-                throw new Error('Il file non sembra un cookies.txt di YouTube');
-            }
-            if (!content.includes('Netscape')) {
-                throw new Error('Formato cookies non valido (atteso Netscape format)');
-            }
-
-            const cookiesPath = path.join(__dirname, 'cookies.txt');
-            fs.writeFileSync(cookiesPath, `${content}\n`, { encoding: 'utf8' });
-            cache.clear();
-
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-                success: true,
-                message: 'Cookies salvati con successo. Puoi riprovare la riproduzione.'
-            }));
-        } catch (err) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: err.message || 'Upload fallito' }));
-        }
         return;
     }
 
