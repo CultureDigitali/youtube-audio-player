@@ -742,11 +742,6 @@ server.listen(PORT, () => {
     console.log('║   🎵 YouTube Audio Player - Server v3.0            ║');
     console.log(`║   🌐 http://localhost:${PORT}                          ║`);
     console.log('[BOOT] Backends: yt-dlp primary, optional cobalt/ytdl-core');
-    if (WARP_PROXY) {
-        console.log(`[BOOT] WARP proxy attivo: ${WARP_PROXY}`);
-    } else {
-        console.log('[BOOT] WARP proxy NON attivo (nessun WARP_SOCKS_PROXY)');
-    }
     console.log('║   ✅ Funziona sia in locale che nel cloud!          ║');
     console.log('╚════════════════════════════════════════════════════╝');
     console.log('');
