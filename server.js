@@ -586,6 +586,26 @@ function serveStatic(filePath, res) {
     });
 }
 
+function readRequestBody(req, maxBytes = 1024 * 1024) {
+    return new Promise((resolve, reject) => {
+        let total = 0;
+        const chunks = [];
+
+        req.on('data', (chunk) => {
+            total += chunk.length;
+            if (total > maxBytes) {
+                reject(new Error('Payload troppo grande'));
+                req.destroy();
+                return;
+            }
+            chunks.push(chunk);
+        });
+
+        req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        req.on('error', reject);
+    });
+}
+
 // Directory base dell'app
 const APP_DIR = __dirname;
 
@@ -670,6 +690,44 @@ const server = http.createServer(async (req, res) => {
             cacheSize: cache.size,
             uptime: Math.floor(process.uptime())
         }));
+        return;
+    }
+
+    // ─── API: Upload cookies.txt (per bypass challenge anti-bot) ─────────
+    if (pathname === '/api/upload-cookies') {
+        if (req.method !== 'POST') {
+            res.writeHead(405, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Metodo non consentito' }));
+            return;
+        }
+
+        try {
+            const rawBody = await readRequestBody(req, 2 * 1024 * 1024);
+            const content = rawBody.replace(/\r\n/g, '\n').trim();
+
+            if (!content) {
+                throw new Error('Contenuto vuoto');
+            }
+            if (!content.includes('youtube.com')) {
+                throw new Error('Il file non sembra un cookies.txt di YouTube');
+            }
+            if (!content.includes('Netscape')) {
+                throw new Error('Formato cookies non valido (atteso Netscape format)');
+            }
+
+            const cookiesPath = path.join(__dirname, 'cookies.txt');
+            fs.writeFileSync(cookiesPath, `${content}\n`, { encoding: 'utf8' });
+            cache.clear();
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                message: 'Cookies salvati con successo. Puoi riprovare la riproduzione.'
+            }));
+        } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: err.message || 'Upload fallito' }));
+        }
         return;
     }
 
