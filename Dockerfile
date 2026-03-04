@@ -1,6 +1,6 @@
 FROM node:20-slim
 
-# Installa dipendenze sistema: Python, yt-dlp, ffmpeg, Cloudflare WARP
+# Installa dipendenze sistema: Python, yt-dlp, ffmpeg, dbus e Cloudflare WARP
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg \
     lsb-release \
+    dbus \
     && rm -rf /var/lib/apt/lists/*
 
 # Installa yt-dlp
