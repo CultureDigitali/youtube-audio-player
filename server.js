@@ -297,46 +297,72 @@ async function extractWithCobalt(videoId) {
     return null;
 }
 // ─── Backend 2: youtube-dl-exec (locale, autonoma, senza dipendenze Python) ─────────────
+function isYtBotChallengeError(message) {
+    const msg = String(message || '').toLowerCase();
+    return msg.includes('sign in to confirm you\'re not a bot') ||
+        msg.includes('sign in to confirm you are not a bot') ||
+        msg.includes('use --cookies') ||
+        msg.includes('requires account to view');
+}
+
 async function extractWithYtDlp(videoId) {
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const cookiesPath = path.join(__dirname, 'cookies.txt');
     const cookieArgs = fs.existsSync(cookiesPath) ? ['--cookies', cookiesPath] : [];
 
-    const commonArgs = [
+    const baseArgs = [
         ...cookieArgs,
         '--dump-single-json',
         '--no-warnings',
         '--no-playlist',
         '--geo-bypass',
         '--no-check-certificates',
-        '-f', 'bestaudio',
-        '--',
-        ytUrl
+        '--force-ipv4',
+        '-f', 'bestaudio/best',
     ];
 
-    const attempts = [
-        { cmd: 'yt-dlp', args: commonArgs, label: 'yt-dlp' },
-        { cmd: 'python3', args: ['-m', 'yt_dlp', ...commonArgs], label: 'python3 -m yt_dlp' },
-        { cmd: 'python', args: ['-m', 'yt_dlp', ...commonArgs], label: 'python -m yt_dlp' },
+    const profiles = [
+        { label: 'default', extraArgs: [] },
+        { label: 'android-lite', extraArgs: ['--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs'] },
+        { label: 'tv-embedded', extraArgs: ['--extractor-args', 'youtube:player_client=tv_embedded,android'] },
     ];
 
-    for (const attempt of attempts) {
-        try {
-            console.log(`[YT-DLP] Tentativo ${attempt.label}...`);
-            const stdout = await runCommand(attempt.cmd, attempt.args, 45000);
-            const data = JSON.parse(stdout);
-            const normalized = normalizeYtDlpPayload(data);
-            if (normalized?.audioUrl) {
-                console.log(`[YT-DLP] OK via ${attempt.label}: "${normalized.title || videoId}"`);
-                return normalized;
+    const runners = [
+        { cmd: 'yt-dlp', argsPrefix: [], label: 'yt-dlp' },
+        { cmd: 'python3', argsPrefix: ['-m', 'yt_dlp'], label: 'python3 -m yt_dlp' },
+        { cmd: 'python', argsPrefix: ['-m', 'yt_dlp'], label: 'python -m yt_dlp' },
+    ];
+
+    let botBlocked = false;
+    let lastError = '';
+
+    for (const profile of profiles) {
+        const profileArgs = [...baseArgs, ...profile.extraArgs, '--', ytUrl];
+
+        for (const runner of runners) {
+            const args = [...runner.argsPrefix, ...profileArgs];
+            const attemptLabel = `${runner.label}/${profile.label}`;
+            try {
+                console.log(`[YT-DLP] Tentativo ${attemptLabel}...`);
+                const stdout = await runCommand(runner.cmd, args, 60000);
+                const data = JSON.parse(stdout);
+                const normalized = normalizeYtDlpPayload(data);
+                if (normalized?.audioUrl) {
+                    console.log(`[YT-DLP] OK via ${attemptLabel}: "${normalized.title || videoId}"`);
+                    return { data: normalized, botBlocked: false, lastError: '' };
+                }
+            } catch (err) {
+                const shortErr = String(err.message || err).slice(0, 260);
+                lastError = shortErr;
+                if (isYtBotChallengeError(shortErr)) {
+                    botBlocked = true;
+                }
+                console.log(`[YT-DLP] Fallito ${attemptLabel}: ${shortErr}`);
             }
-        } catch (err) {
-            const shortErr = String(err.message || err).slice(0, 220);
-            console.log(`[YT-DLP] Fallito ${attempt.label}: ${shortErr}`);
         }
     }
 
-    return null;
+    return { data: null, botBlocked, lastError };
 }
 
 async function extractWithYtdlCore(videoId) {
@@ -405,7 +431,8 @@ async function extractVideoInfo(videoId) {
 
     const meta = await getVideoMetadata(videoId);
     let audioResult = null;
-    const ytdlpResult = await extractWithYtDlp(videoId);
+    const ytdlpAttempt = await extractWithYtDlp(videoId);
+    const ytdlpResult = ytdlpAttempt?.data || null;
     if (ytdlpResult?.audioUrl) {
         const valid = await validateAudioUrl(ytdlpResult.audioUrl);
         if (valid) {
@@ -416,6 +443,8 @@ async function extractVideoInfo(videoId) {
         } else {
             console.log('[EXTRACT] URL yt-dlp non valida, provo fallback...');
         }
+    } else if (ytdlpAttempt?.botBlocked) {
+        console.log('[EXTRACT] yt-dlp bloccato da challenge bot YouTube per questo video.');
     }
 
     // 2) Optional fallback: cobalt (only if configured)
@@ -448,7 +477,10 @@ async function extractVideoInfo(videoId) {
     }
 
     if (!audioResult || !audioResult.audioUrl) {
-        throw new Error('Impossibile estrarre l\'audio. Verifica che il deploy usi Docker con yt-dlp disponibile.');
+        if (ytdlpAttempt?.botBlocked) {
+            throw new Error('YouTube richiede verifica anti-bot per questo video. Configura cookies.txt o abilita un backend cloud fallback.');
+        }
+        throw new Error('Impossibile estrarre l\'audio dal video richiesto. Riprova con un altro link o verifica fallback/cookies.');
     }
 
     const result = {
