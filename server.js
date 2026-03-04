@@ -165,65 +165,46 @@ async function extractWithCobalt(videoId) {
     }
     return null;
 }
+// ─── Backend 2: youtube-dl-exec (locale, autonoma, senza dipendenze Python) ─────────────
+const youtubedl = require('youtube-dl-exec');
 
-// ─── Backend 2: yt-dlp (locale, affidabile) ─────────────
 function extractWithYtDlp(videoId) {
     return new Promise((resolve) => {
         const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-        // Prova prima python3 poi python
-        const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+        const options = {
+            dumpJson: true,
+            noWarnings: true,
+            noCheckCertificates: true,
+            format: 'bestaudio',
+            geoBypass: true
+        };
 
-        const args = [
-            '-m', 'yt_dlp',
-            '-j',
-            '--no-download',
-            '-f', 'bestaudio',
-            '--no-warnings',
-            '--no-check-certificates',
-            '--geo-bypass',
-            ytUrl
-        ];
-
-        // Check se ci sono cookies
         const cookiesPath = path.join(__dirname, 'cookies.txt');
         if (fs.existsSync(cookiesPath)) {
-            args.splice(2, 0, '--cookies', cookiesPath);
+            options.cookies = cookiesPath;
         }
 
-        console.log(`[YT-DLP] Tentativo con ${pythonCmd}...`);
+        console.log(`[YT-DLP-EXEC] Tentativo per ${videoId}...`);
 
-        execFile(pythonCmd, args, {
-            timeout: 60000,
-            maxBuffer: 1024 * 1024 * 5
-        }, (error, stdout, stderr) => {
-            if (error) {
-                console.log(`[YT-DLP] Errore:`, error.message);
-                if (stderr) console.log(`[YT-DLP] Stderr:`, stderr.slice(0, 300));
-                resolve(null);
-                return;
-            }
-
-            try {
-                const data = JSON.parse(stdout);
-                console.log(`[YT-DLP] OK: "${data.title}"`);
-                resolve({
-                    title: data.title,
-                    author: data.uploader || data.channel,
-                    channelId: data.channel_id || '',
-                    viewCount: data.view_count || 0,
-                    lengthSeconds: data.duration || 0,
-                    audioUrl: data.url,
-                    audioBitrate: data.abr || 128,
-                    audioType: data.ext === 'webm' ? 'audio/webm' : 'audio/mp4',
-                    thumbnailUrl: data.thumbnail,
-                    description: (data.description || '').slice(0, 200),
-                    source: 'yt-dlp',
-                });
-            } catch (e) {
-                console.log(`[YT-DLP] Parse error:`, e.message);
-                resolve(null);
-            }
+        youtubedl(ytUrl, options).then(data => {
+            console.log(`[YT-DLP-EXEC] OK: "${data.title}"`);
+            resolve({
+                title: data.title,
+                author: data.uploader || data.channel,
+                channelId: data.channel_id || '',
+                viewCount: data.view_count || 0,
+                lengthSeconds: data.duration || 0,
+                audioUrl: data.url,
+                audioBitrate: data.abr || 128,
+                audioType: data.ext === 'webm' ? 'audio/webm' : 'audio/mp4',
+                thumbnailUrl: data.thumbnail,
+                description: (data.description || '').slice(0, 200),
+                source: 'yt-dlp',
+            });
+        }).catch(error => {
+            console.log(`[YT-DLP-EXEC] Errore:`, error.message.slice(0, 300));
+            resolve(null);
         });
     });
 }
