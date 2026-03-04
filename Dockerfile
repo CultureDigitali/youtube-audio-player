@@ -14,7 +14,11 @@ RUN python3 -m pip install --break-system-packages yt-dlp
 # Crea directory app
 WORKDIR /app
 
-# Copia tutti i file
+# Installa dipendenze Node
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copia tutti i file applicativi
 COPY . .
 
 # Esponi la porta (Render usa PORT env var)

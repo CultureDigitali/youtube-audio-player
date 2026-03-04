@@ -11,6 +11,7 @@ class AudioPlayer {
         this.queue = [];
         this.currentIndex = -1;
         this.wakeLock = null;
+        this.resumeOnGestureHandler = null;
 
         // Shuffle & Repeat
         this.shuffleEnabled = false;
@@ -120,14 +121,68 @@ class AudioPlayer {
 
         try {
             await this.audio.play();
+            this.clearResumeOnUserGesture();
             this.isPlaying = true;
             this.updatePlayButton();
             this.requestWakeLock();
             this.onPlayStateChange?.(true);
         } catch (error) {
             console.error('Playback failed:', error);
+            const isAutoplayBlock = error?.name === 'NotAllowedError' ||
+                /gesture|autoplay|notallowed/i.test(error?.message || '');
+
+            if (isAutoplayBlock) {
+                const recovered = await this.tryMutedAutoplay();
+                if (recovered) return;
+
+                this.armResumeOnUserGesture();
+                this.showError('Il browser ha bloccato l\'autoplay. Tocca di nuovo Play.');
+                return;
+            }
+
             this.showError('Errore nella riproduzione: ' + error.message);
         }
+    }
+
+    async tryMutedAutoplay() {
+        const previousMuted = this.audio.muted;
+        try {
+            this.audio.muted = true;
+            await this.audio.play();
+            this.audio.muted = previousMuted;
+            this.clearResumeOnUserGesture();
+            this.isPlaying = true;
+            this.updatePlayButton();
+            this.requestWakeLock();
+            this.onPlayStateChange?.(true);
+            return true;
+        } catch {
+            this.audio.muted = previousMuted;
+            return false;
+        }
+    }
+
+    armResumeOnUserGesture() {
+        if (this.resumeOnGestureHandler) return;
+
+        this.resumeOnGestureHandler = async () => {
+            try {
+                await this.audio.play();
+                this.clearResumeOnUserGesture();
+            } catch {
+                // keep waiting for a valid gesture
+            }
+        };
+
+        document.addEventListener('pointerdown', this.resumeOnGestureHandler, { passive: true });
+        document.addEventListener('keydown', this.resumeOnGestureHandler);
+    }
+
+    clearResumeOnUserGesture() {
+        if (!this.resumeOnGestureHandler) return;
+        document.removeEventListener('pointerdown', this.resumeOnGestureHandler);
+        document.removeEventListener('keydown', this.resumeOnGestureHandler);
+        this.resumeOnGestureHandler = null;
     }
 
     pause() {

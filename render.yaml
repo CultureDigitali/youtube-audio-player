@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: youtube-audio-player
+    env: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/status
+    autoDeploy: true

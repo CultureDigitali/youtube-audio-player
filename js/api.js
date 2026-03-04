@@ -44,7 +44,7 @@ const API = {
     async fetchVideoData(videoId) {
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 35000); // yt-dlp può impiegare qualche secondo
+            const timeoutId = setTimeout(() => controller.abort(), 90000); // Render cold start + estrazione audio possono richiedere più tempo
 
             console.log(`[API] Richiedo dati per video: ${videoId}`);
 
@@ -75,7 +75,7 @@ const API = {
             if (error.name === 'AbortError') {
                 return {
                     success: false,
-                    error: 'Timeout: il server è lento. Riprova tra poco.'
+                    error: 'Timeout: server lento o in cold start. Attendi qualche secondo e riprova.'
                 };
             }
 
